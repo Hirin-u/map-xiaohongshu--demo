@@ -2300,7 +2300,7 @@
   @media (max-width: 500px) {
     body {
       padding: 0;
-      background: #E0E0E0;
+      background: #F8F8F8;
       align-items: stretch;
     }
     .phone-frame {
@@ -2309,6 +2309,20 @@
       height: 100dvh;
       border-radius: 0;
       box-shadow: none;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      background: #F8F8F8;
+    }
+    .phone-frame::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: env(safe-area-inset-top);
+      background: #F8F8F8;
+      z-index: 999;
+      pointer-events: none;
     }
     .status-bar {
       display: none;
