@@ -2,22 +2,14 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="奥兰多">
+<link rel="manifest" href="data:application/json;charset=utf-8,{&quot;name&quot;:&quot;奥兰多·城市生活&quot;,&quot;short_name&quot;:&quot;奥兰多&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;background_color&quot;:&quot;%23E0E0E0&quot;,&quot;theme_color&quot;:&quot;%23E0E0E0&quot;}">
 <title>奥兰多 · 城市生活</title>
 <style>
-  @font-face {
-    font-family: 'PingFangSC';
-    src: url('font/PingFangSC-Regular.otf') format('opentype');
-    font-weight: 400;
-    font-style: normal;
-  }
-  @font-face {
-    font-family: 'PingFangSC';
-    src: url('font/PingFangSC-Semibold.otf') format('opentype');
-    font-weight: 600;
-    font-style: normal;
-  }
-
   * {
     margin: 0;
     padding: 0;
@@ -26,7 +18,7 @@
   }
 
   body {
-    font-family: 'PingFangSC', -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
     background: #E0E0E0;
     display: flex;
     justify-content: center;
@@ -40,6 +32,8 @@
     height: 844px;
     position: relative;
     overflow: hidden;
+    border-radius: 40px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 0 0 10px #1a1a1a, 0 0 0 12px #333;
   }
 
   .map-view {
@@ -2314,6 +2308,11 @@
       width: 100vw;
       height: 100vh;
       height: 100dvh;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    .status-bar {
+      display: none;
     }
     .map-view,
     .feed-layer {
