@@ -1,0 +1,3550 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>奥兰多 · 城市生活</title>
+<style>
+  @font-face {
+    font-family: 'PingFangSC';
+    src: url('font/PingFangSC-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'PingFangSC';
+    src: url('font/PingFangSC-Semibold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    font-family: 'PingFangSC', -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: #E0E0E0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 20px 0;
+  }
+
+  .phone-frame {
+    width: 390px;
+    height: 844px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .map-view {
+    position: absolute;
+    inset: 0;
+    width: 390px;
+    height: 844px;
+    z-index: 0;
+    overflow: hidden;
+    text-align: center;
+  }
+
+  .map-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: block;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .map-scroll {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 780px;
+    height: 1688px;
+    transform: translate(0, 0);
+    will-change: transform;
+    cursor: grab;
+  }
+
+  .map-scroll.panning {
+    cursor: grabbing;
+    transition: none !important;
+  }
+
+  .map-scroll.snap {
+    transition: transform 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  .feed-layer {
+    position: absolute;
+    inset: 0;
+    width: 390px;
+    height: 844px;
+    z-index: 10;
+    background: #F8F8F8;
+    transform: translateY(0);
+    transition: transform 0.45s cubic-bezier(0.32, 0.72, 0, 1);
+    will-change: transform;
+    display: flex;
+    flex-direction: column;
+    cursor: grab;
+    touch-action: pan-y;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    overflow: hidden;
+  }
+
+  .feed-layer.dragging {
+    transition: none;
+    cursor: grabbing;
+  }
+
+  .page-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .page-container::-webkit-scrollbar { display: none; }
+
+  .feed-layer.in-map .page-container {
+    overflow: hidden;
+    scroll-behavior: auto;
+  }
+  .feed-layer.in-map ~ .view-nearby-btn {
+    top: 650px;
+    z-index: 5;
+    visibility: visible;
+    opacity: 1;
+  }
+  .phone-frame.map-fullscreen .view-nearby-btn {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  .pull-hint {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%) translateY(calc(-100% - 16px));
+    width: 120px;
+    height: 36px;
+    background: rgba(255,255,255,0.95);
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #666;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    pointer-events: none;
+    transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+    opacity: 0;
+  }
+
+  .pull-hint.show {
+    opacity: 1;
+  }
+
+  .pull-hint.ready .hint-arrow {
+    transform: rotate(180deg);
+  }
+
+  .hint-arrow {
+    width: 14px;
+    height: 14px;
+    transition: transform 0.25s;
+  }
+
+  .status-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 28px 0 24px;
+    background-color: transparent;
+    z-index: 200;
+    pointer-events: none;
+  }
+
+  .status-time {
+    font-size: 15px;
+    font-weight: 600;
+    color: #000;
+    width: 54px;
+  }
+
+  .status-icons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .signal-bars {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+  }
+
+  .signal-bars span {
+    width: 3px;
+    background: #000;
+    border-radius: 1px;
+  }
+
+  .signal-bars span:nth-child(1) { height: 4px; }
+  .signal-bars span:nth-child(2) { height: 6px; }
+  .signal-bars span:nth-child(3) { height: 8px; }
+  .signal-bars span:nth-child(4) { height: 10px; }
+
+  .battery {
+    width: 24px;
+    height: 12px;
+    border: 1px solid #000;
+    border-radius: 3px;
+    padding: 2px;
+    position: relative;
+  }
+
+  .battery::after {
+    content: '';
+    position: absolute;
+    right: -3px;
+    top: 3px;
+    width: 2px;
+    height: 6px;
+    background: #000;
+    border-radius: 0 1px 1px 0;
+  }
+
+  .battery-level {
+    width: 80%;
+    height: 100%;
+    background: #000;
+    border-radius: 1px;
+  }
+
+  #phoneFrame:has(.loc-detail-overlay.show) .status-time { color: #fff; }
+  #phoneFrame:has(.loc-detail-overlay.show) .signal-bars span { background: #fff; }
+  #phoneFrame:has(.loc-detail-overlay.show) .battery { border-color: #fff; }
+  #phoneFrame:has(.loc-detail-overlay.show) .battery::after { background: #fff; }
+  #phoneFrame:has(.loc-detail-overlay.show) .battery-level { background: #fff; }
+
+  .top-tabs {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 44px 16px 6px;
+    background: #F8F8F8;
+    position: sticky;
+    top: 0;
+    z-index: 99;
+    flex-shrink: 0;
+  }
+
+  .top-tab-icon {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .top-tab-icon.left {
+    margin-right: 8px;
+  }
+
+  .top-tab-icon.right {
+    margin-left: 8px;
+    width: 20px;
+    height: 20px;
+  }
+
+  .tabs-scroll {
+    display: flex;
+    gap: 24px;
+    position: relative;
+  }
+
+  .tab-item {
+    font-size: 14px;
+    font-weight: 500;
+    color: #000;
+    cursor: pointer;
+    padding: 6px 0;
+    position: relative;
+    transition: color 0.2s;
+    user-select: none;
+    opacity: 0.5;
+  }
+
+  .tab-item.active {
+    font-weight: 700;
+    opacity: 1;
+  }
+
+  .tab-item.active::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 16px;
+    height: 2px;
+    background: #FF2442;
+    border-radius: 1px;
+  }
+
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 23.5px;
+    padding: 0 20px;
+    margin-bottom: 10px;
+    background: #F8F8F8;
+    height: 36px;
+    position: sticky;
+    top: 72px;
+    z-index: 98;
+    flex-shrink: 0;
+  }
+
+  .filter-item {
+    font-size: 14px;
+    font-weight: 400;
+    color: #000;
+    cursor: pointer;
+    white-space: nowrap;
+    padding: 4px 0;
+    user-select: none;
+    transition: color 0.2s, font-weight 0.2s;
+    opacity: 0.6;
+  }
+
+  .filter-item.active {
+    font-weight: 600;
+    color: #000000;
+    opacity: 1;
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+
+  .filter-item .refresh-icon {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    margin-left: 4px;
+    vertical-align: middle;
+    cursor: pointer;
+    opacity: 0.6;
+    color: #ff2442;
+  }
+
+  .filter-item .refresh-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .masonry {
+    display: flex;
+    gap: 4px;
+    padding: 0 4px;
+  }
+
+  .masonry-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .card {
+    background: #fff;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+
+  .card:active {
+    transform: scale(0.97);
+  }
+
+  .card-img {
+    width: 100%;
+    display: block;
+    object-fit: cover;
+    background: #eee;
+  }
+
+  .card-body {
+    padding: 8px 7px 8px;
+  }
+
+  .card-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: #000;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-clamp: 2;
+    margin-bottom: 8px;
+  }
+
+  .card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .card-user {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .user-avatar {
+    width: 21px;
+    height: 21px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: #ddd;
+  }
+
+  .user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .user-name {
+    font-size: 11px;
+    font-weight: 400;
+    color: rgba(0, 0, 0, 0.6);
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .user-date {
+    font-size: 9px;
+    font-weight: 500;
+    color: #000000;
+    opacity: 0.3;
+    line-height: 1;
+  }
+
+  .card-like {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: transform 0.15s;
+    opacity: 0.6;
+  }
+
+  .card-like:active {
+    transform: scale(0.85);
+  }
+
+  .like-icon {
+    width: 14px;
+    height: 14px;
+    transition: fill 0.2s;
+  }
+
+  .card-like.liked .like-icon {
+    fill: #FF2442;
+  }
+
+  .card-like.liked .like-count {
+    color: #FF2442;
+  }
+
+  .like-count {
+    font-size: 11px;
+    font-weight: 400;
+    color: #000;
+    line-height: 1;
+    transition: color 0.2s;
+  }
+
+  .bottom-nav {
+    width: 390px;
+    background: #fff;
+    border-top: 1px solid #eee;
+    flex-shrink: 0;
+  }
+
+  .nav-items {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 20px;
+    height: 49px;
+  }
+
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    padding: 4px;
+    user-select: none;
+    transition: transform 0.15s;
+  }
+
+  .nav-item:active {
+    transform: scale(0.9);
+  }
+
+  .nav-item.center-btn {
+    background: #FF2442;
+    border-radius: 9px;
+    width: 42px;
+    height: 31px;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+  }
+
+  .nav-item.center-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: #fff;
+  }
+
+  .nav-item.center-btn .nav-label {
+    display: none;
+  }
+
+  .nav-label {
+    font-size: 15px;
+    font-weight: 500;
+    color: rgba(0, 0, 0, 0.5);
+  }
+
+  .nav-item.active .nav-label {
+    color: #FF2442;
+    font-weight: 700;
+  }
+
+  .home-indicator {
+    width: 135px;
+    height: 5px;
+    background: #000;
+    border-radius: 3px;
+    margin: 6px auto 8px;
+  }
+
+  /* ============ MAP VIEW ============ */
+  .map-top-group {
+    position: absolute;
+    top: 48px;
+    left: 0;
+    right: 0;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 8;
+    pointer-events: none;
+  }
+  .map-top-group > * { pointer-events: auto; }
+
+  .shared-location-bar {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 125px;
+    height: 38px;
+    background: #fff;
+    border-radius: 19px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 16px;
+    gap: 8px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    z-index: 5;
+    text-align: center;
+  }
+
+  .shared-loc-plane {
+    width: 23px;
+    height: 18px;
+    font-size: 23px;
+    transform: rotate(-45deg);
+    display: flex;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    padding-left: 2px;
+    padding-right: 2px;
+    text-align: center;
+  }
+
+  .shared-loc-plane path {
+    fill: #FF3B30;
+  }
+
+  .shared-loc-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #000;
+    white-space: nowrap;
+  }
+
+  .map-pin {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    z-index: 3;
+    cursor: pointer;
+  }
+
+  .pin-post {
+    position: relative;
+    width: 60px;
+    height: 80px;
+    border-radius: 12px;
+    border: 3px solid #ffffff;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.28));
+    transform: scale(0.7);
+    transform-origin: center center;
+  }
+
+  .pin-post > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: 9px;
+  }
+
+  .pin-post::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 16px;
+    height: 13px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 13'%3E%3Cpath d='M0,0 L8,13 L16,0 Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center/contain;
+  }
+
+  .pin-post-avatar {
+    position: absolute;
+    top: 42px;
+    left: 4px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    overflow: hidden;
+    z-index: 2;
+    filter: drop-shadow(0 1px 4px rgba(0,0,0,0.2));
+  }
+
+  .pin-post-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .pin-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  }
+
+  .pin-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .pin-label {
+    position: absolute;
+    left: 50%;
+    top: 54px;
+    transform: translateX(-50%);
+    background: rgba(255,255,255,0.95);
+    border-radius: 10px;
+    padding: 3px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    min-width: 44px;
+    z-index: 10;
+  }
+
+  .pin-label .name {
+    font-weight: 600;
+    color: #000;
+  }
+
+  .pin-label .dist {
+    font-weight: 500;
+    color: #FF2442;
+  }
+
+  .pin-label.location {
+    background: #FF2442;
+    color: #fff;
+    border-radius: 12px;
+  }
+
+  .pin-label.location .name {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .map-title {
+    position: absolute;
+    left: 102px;
+    top: 291px;
+    font-size: 20px;
+    font-weight: 700;
+    color: #000;
+    z-index: 4;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+  }
+
+  .view-nearby-btn {
+    position: absolute;
+    left: 123px;
+    top: 765px;
+    width: 144px;
+    height: 42px;
+    background: rgba(255,255,255,0.95);
+    border-radius: 21px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: #FF2442;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    z-index: 15;
+    cursor: pointer;
+    border: none;
+    visibility: hidden;
+    opacity: 0;
+    transition: visibility 0s 0.2s, opacity 0.2s ease, transform 0.15s, background 0.15s, color 0.15s;
+  }
+
+  .view-nearby-btn:hover {
+    background: #FF2442;
+    color: #fff;
+  }
+
+  .view-nearby-btn:active { transform: scale(0.95); }
+
+  .view-nearby-btn .arrow {
+    margin-left: 4px;
+  }
+
+  .map-bottom-nav {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 390px;
+    background: rgba(255,255,255,0.98);
+    z-index: 5;
+    display: none;
+  }
+
+  .back-arrow-fab {
+    position: static;
+    margin-left: auto;
+    width: 38px;
+    height: 38px;
+    background: rgba(255,255,255,0.95);
+    border-radius: 50%;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 6;
+    border: none;
+    transition: transform 0.15s;
+  }
+
+  .back-arrow-fab:active { transform: scale(0.9); }
+
+  .back-arrow-fab svg {
+    width: 20px;
+    height: 20px;
+    stroke: #000;
+    fill: none;
+    stroke-width: 2;
+    transform: rotate(450deg);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* ============ POST DETAIL ============ */
+  .detail-overlay {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    z-index: 110;
+    display: none;
+    flex-direction: column;
+    animation: fadeIn 0.2s;
+  }
+
+  .detail-overlay.show {
+    display: flex;
+  }
+
+  .detail-nav {
+    height: 42px;
+    margin-top: 40px;
+    margin-bottom: 10px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #fff;
+    flex-shrink: 0;
+  }
+
+  .detail-nav-back {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 0;
+  }
+
+  .detail-nav-back svg {
+    width: 22px;
+    height: 22px;
+    stroke: #000;
+    stroke-width: 2.2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .detail-nav-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .detail-nav-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .detail-nav-name {
+    font-size: 15px;
+    font-weight: 600;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .detail-nav-follow {
+    font-size: 13px;
+    font-weight: 600;
+    color: #FF2442;
+    border: 1px solid #FF2442;
+    background: #fff;
+    border-radius: 18px;
+    padding: 5px 14px;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .detail-nav-share {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 0;
+  }
+
+  .detail-nav-share svg {
+    width: 22px;
+    height: 22px;
+    stroke: #000;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .detail-scroll {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .detail-img-wrap {
+    position: relative;
+    width: 100%;
+    background: #f5f5f5;
+  }
+
+  .detail-img {
+    width: 100%;
+    display: block;
+  }
+
+  .detail-img-tag {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(0,0,0,0.5);
+    color: #fff;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 14px;
+  }
+
+  .detail-img-tag .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #fff;
+  }
+
+  .detail-img-count {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(0,0,0,0.45);
+    color: #fff;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 14px;
+  }
+
+  .detail-img-dots {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+  }
+
+  .detail-img-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.5);
+  }
+
+  .detail-img-dots span.active {
+    background: #fff;
+  }
+
+  .detail-body {
+    padding: 14px 16px 12px;
+  }
+
+  .detail-location {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+    color: #000;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  .detail-location svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: #000;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .detail-text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #222;
+    margin-bottom: 8px;
+    white-space: pre-wrap;
+  }
+
+  .detail-footer-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 16px;
+    border-top: 1px solid #f0f0f0;
+    background: #fff;
+    flex-shrink: 0;
+  }
+
+  .detail-input-hint {
+    flex: 1;
+    background: #f3f3f3;
+    border-radius: 18px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: #999;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .detail-input-hint svg {
+    width: 15px;
+    height: 15px;
+    stroke: #999;
+    stroke-width: 2;
+    fill: none;
+  }
+
+  .detail-bottom-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    cursor: pointer;
+    min-width: 42px;
+  }
+
+  .detail-bottom-action svg {
+    width: 22px;
+    height: 22px;
+    stroke: #333;
+    stroke-width: 1.8;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .detail-bottom-action .num {
+    font-size: 11px;
+    color: #666;
+  }
+
+  .detail-bottom-action.liked svg {
+    stroke: #FF2442;
+    fill: #FF2442;
+  }
+
+  .detail-bottom-action.starred svg {
+    stroke: #FFB800;
+    fill: #FFB800;
+  }
+
+  .refresh-toast {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.75);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 300;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .refresh-toast.show {
+    opacity: 1;
+  }
+
+  /* ============ LOCATION NEARBY PAGE ============ */
+  .location-overlay {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    z-index: 55;
+    display: none;
+    flex-direction: column;
+    animation: fadeIn 0.2s;
+  }
+
+  .location-overlay.show {
+    display: flex;
+  }
+
+  .loc-hero {
+    position: relative;
+    width: 100%;
+    height: 158px;
+    flex-shrink: 0;
+    overflow: hidden;
+    background-image: url('images/bg.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  .loc-hero-nav {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 70px;
+    padding: 44px 0 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .loc-nav-back {
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 12px;
+    cursor: pointer;
+  }
+
+  .loc-nav-back svg {
+    width: 25px;
+    height: 25px;
+  }
+
+  .loc-nav-right {
+    display: flex;
+    gap: 12px;
+    margin-right: 12px;
+  }
+
+  .loc-nav-icon {
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .loc-nav-icon svg {
+    width: 18px;
+    height: 18px;
+    stroke: #000;
+  }
+
+  .loc-hero-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0 20px 14px;
+    color: #fff;
+  }
+
+  .loc-hero-title {
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 20px;
+    margin-bottom: 6px;
+    color: #000000;
+  }
+
+  .loc-hero-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 400;
+    color: #FF2442;
+  }
+
+  .loc-hero-meta svg {
+    fill: #FF2442;
+  }
+
+  .loc-filter-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    height: 44px;
+    background: #fff;
+    flex-shrink: 0;
+  }
+
+  .loc-filter-tabs {
+    display: flex;
+    gap: 20px;
+  }
+
+  .loc-filter-tab {
+    font-size: 14px;
+    font-weight: 400;
+    color: #999;
+    cursor: pointer;
+    line-height: 20px;
+    padding-bottom: 2px;
+    position: relative;
+  }
+
+  .loc-filter-tab.active {
+    font-weight: 600;
+    color: #000;
+    font-size: 16px;
+  }
+
+  .loc-filter-btn {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 14px;
+    font-weight: 400;
+    color: #000;
+    cursor: pointer;
+  }
+
+  .loc-scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+  }
+
+  .loc-scroll-area::-webkit-scrollbar { display: none; }
+
+  .loc-masonry {
+    display: flex;
+    gap: 4px;
+    padding: 6px 6px 100px;
+  }
+
+  .loc-masonry-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .loc-card {
+    background: #fff;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    position: relative;
+  }
+
+  .loc-card:active {
+    transform: scale(0.97);
+  }
+
+  .loc-card-img {
+    width: 100%;
+    display: block;
+    object-fit: cover;
+    background: #eee;
+  }
+
+  .loc-card-play {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .loc-card-play svg {
+    width: 12px;
+    height: 12px;
+    fill: #fff;
+  }
+
+  .loc-card-body {
+    padding: 6px 6px 8px;
+  }
+
+  .loc-card-text {
+    font-size: 12px;
+    font-weight: 500;
+    color: #000;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-clamp: 2;
+    margin-bottom: 6px;
+  }
+
+  .loc-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .loc-card-user {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .loc-card-avatar {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: #ddd;
+  }
+
+  .loc-card-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .loc-card-name {
+    font-size: 11px;
+    font-weight: 400;
+    color: #666;
+    max-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .loc-card-user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+
+  .loc-card-date {
+    font-size: 10px;
+    color: #999;
+    line-height: 1;
+  }
+
+  .loc-card-like {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 12px;
+    font-weight: 400;
+    color: #666;
+    cursor: pointer;
+  }
+
+  .loc-card-like svg {
+    width: 12px;
+    height: 11px;
+  }
+
+  .loc-fab {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 126px;
+    height: 42px;
+    background: #FF2442;
+    border-radius: 999px;
+    border: 1px solid #FF2442;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 2px 12px rgba(255,36,66,0.2);
+    z-index: 10;
+    transition: transform 0.15s, background 0.15s, color 0.15s;
+  }
+
+  .loc-fab:active {
+    transform: translateX(-50%) scale(0.95);
+  }
+
+  .loc-fab-icon {
+    width: 16px;
+    height: 16px;
+    display: block;
+  }
+
+  .loc-detail-overlay {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    z-index: 105;
+    display: none;
+    animation: fadeIn 0.2s;
+  }
+
+  .loc-detail-overlay.show {
+    display: block;
+  }
+
+  .loc-detail-hero {
+    position: absolute;
+    inset: 0;
+  }
+
+  .loc-detail-hero img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .loc-detail-top-gradient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 200px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent);
+    pointer-events: none;
+  }
+
+  .loc-detail-bottom-gradient {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 450px;
+    background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+    pointer-events: none;
+  }
+
+  .loc-detail-nav {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding-top: 44px;
+    display: flex;
+    justify-content: space-between;
+    z-index: 5;
+  }
+
+  .loc-detail-back {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    padding: 0;
+    margin-left: 12px;
+    backdrop-filter: blur(4px);
+  }
+
+  .loc-detail-back svg {
+    width: 28px;
+    height: 32px;
+  }
+
+  .loc-detail-nav-right {
+    display: flex;
+    gap: 8px;
+    margin-right: 12px;
+  }
+
+  .loc-detail-icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    padding: 0;
+  }
+
+  .loc-detail-icon svg {
+    width: 20px;
+    height: 20px;
+    stroke: #fff;
+  }
+
+  .loc-detail-social {
+    position: absolute;
+    right: 10px;
+    top: 350px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    z-index: 5;
+  }
+
+  .loc-detail-social-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+
+  .loc-detail-social-item svg {
+    width: 28px;
+    height: 28px;
+    stroke: #fff;
+    fill: none;
+    stroke-width: 2;
+  }
+
+  .loc-detail-social-item svg.loc-detail-heart-fill {
+    fill: #FF2442;
+    stroke: #FF2442;
+  }
+
+  .loc-detail-social-item svg.loc-detail-star-fill {
+    fill: #FFD700;
+    stroke: #FFD700;
+  }
+
+  .loc-detail-social-count {
+    font-size: 12px;
+    font-weight: 500;
+    color: #fff;
+  }
+
+  .loc-detail-social-item.liked svg {
+    fill: #FF2442;
+    stroke: #FF2442;
+  }
+
+  .loc-detail-social-item.starred svg {
+    fill: #FFD700;
+    stroke: #FFD700;
+  }
+
+  .loc-detail-content {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 70px;
+    padding: 0 12px;
+    z-index: 5;
+    color: #fff;
+  }
+
+  .loc-detail-location-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 13px;
+    font-weight: 300;
+    color: #fff;
+    background: rgba(0,0,0,0.2);
+    border-radius: 5px;
+    padding: 4px 10px;
+    margin-bottom: 12px;
+    backdrop-filter: none;
+  }
+
+  .loc-detail-location-tag svg {
+    width: 14px;
+    height: 17px;
+    fill: #fff;
+  }
+
+  .loc-detail-user-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .loc-detail-avatar {
+    width: 33px;
+    height: 33px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.5);
+  }
+
+  .loc-detail-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .loc-detail-name {
+    font-size: 14px;
+    font-weight: 400;
+    color: #fff;
+  }
+
+  .loc-detail-follow {
+    font-size: 12px;
+    font-weight: 400;
+    color: #fff;
+    border: none;
+    background: #FF2442;
+    border-radius: 999px;
+    width: 56px;
+    height: 28px;
+    padding: 0;
+    cursor: pointer;
+    line-height: 28px;
+    margin-left: 4px;
+  }
+
+  .loc-detail-text {
+    font-size: 14px;
+    font-weight: 400;
+    color: #fff;
+    line-height: 1.5;
+    margin-bottom: 8px;
+  }
+
+  .loc-detail-tags {
+    font-size: 13px;
+    font-weight: 400;
+    color: #c6d6e6;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+  }
+
+  .loc-detail-related {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 12px;
+    font-weight: 400;
+    color: rgba(255,255,255,0.85);
+    background: rgba(0,0,0,0.2);
+    border-radius: 0px;
+    padding: 8px 20px;
+    width: calc(100% + 24px);
+    margin-left: -12px;
+    height: 33px;
+    text-align: center;
+  }
+
+  .loc-detail-related-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.6);
+  }
+
+  .loc-detail-bottom-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    padding-bottom: 16px;
+    gap: 12px;
+    z-index: 5;
+    background: #000;
+  }
+
+  .loc-detail-input {
+    flex: 1;
+    height: 38px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 19px;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 8px;
+  }
+
+  .loc-detail-input-placeholder {
+    flex: 1;
+    font-size: 14px;
+    color: rgba(255,255,255,0.4);
+  }
+
+  .loc-detail-input-icons {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .loc-detail-action-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes heartPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
+  .heart-pop { animation: heartPop 0.3s ease; }
+
+  .search-overlay {
+    position: absolute;
+    inset: 0;
+    background: #F8F8F8;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .search-overlay.show {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .search-entry-view { display: none; flex-direction: column; height: 100%; }
+  .search-results-view { display: none; flex-direction: column; height: 100%; }
+  .search-overlay.mode-entry .search-entry-view { display: flex; }
+  .search-overlay.mode-results .search-results-view { display: flex; }
+
+  .search-entry-header {
+    display: flex;
+    align-items: center;
+    padding: 50px 20px 10px 12px;
+    gap: 8px;
+    background: transparent;
+  }
+  .search-entry-input-wrap {
+    flex: 1;
+    background: #ffffff;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    height: 36px;
+    gap: 6px;
+    box-shadow: 0px 0px 8px 0px #ebebeb;
+  }
+  .search-entry-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 400;
+    outline: none;
+    color: #000;
+  }
+  .search-entry-input::placeholder { color: #999; }
+  .search-entry-clear {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #e0e0e0;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .search-entry-clear svg { width: 10px; height: 10px; }
+
+  .search-entry-options {
+    display: flex;
+    gap: 20px;
+    padding: 6px 40px 6px;
+    height: 32px;
+    font-size: 13px;
+    color: #333;
+  }
+  .search-entry-option {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .ai-radio {
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid #999;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .search-entry-section {
+    padding: 0 16px;
+  }
+  .search-entry-section-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 600;
+    color: #000;
+    margin-bottom: 12px;
+  }
+  .search-entry-more {
+    font-size: 18px;
+    font-weight: 400;
+    color: #999;
+    padding: 0 4px;
+  }
+  .search-entry-clear-history {
+    font-size: 13px;
+    font-weight: 400;
+    color: #999;
+    cursor: pointer;
+  }
+  .search-entry-suggests {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 16px;
+  }
+  .search-entry-suggest-item {
+    font-size: 14px;
+    color: #333;
+    padding: 8px 0;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .search-entry-history {
+    padding: 6px 16px 6px;
+  }
+  .search-entry-history-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 11px;
+  }
+  .search-entry-history-tag {
+    background: #fff;
+    border-radius: 14px;
+    padding: 6px 14px;
+    font-size: 13px;
+    color: #333;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  .search-entry-bottom {
+    margin-top: auto;
+    padding: 20px 0 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .search-entry-bottom span {
+    font-size: 13px;
+    color: #999;
+  }
+  .search-entry-mic {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #FF2442;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(255,36,66,0.3);
+  }
+
+  .map-fullscreen-back {
+    position: static;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.92);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    padding: 0;
+  }
+  .map-fullscreen-back svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .search-header {
+    display: flex;
+    align-items: center;
+    padding: 50px 20px 10px 12px;
+    gap: 8px;
+    background: transparent;
+  }
+  .search-back {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+  }
+  .search-back svg { width: 24px; height: 24px; }
+  .search-input-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 0 12px;
+    height: 36px;
+    gap: 6px;
+    box-shadow: 0px 0px 8px 0px #ebebeb;
+  }
+  .search-input-clear {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #e0e0e0;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .search-input-clear svg {
+    width: 10px;
+    height: 10px;
+  }
+  .search-submit {
+    border: none;
+    background: transparent;
+    color: #333;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .search-input-divider {
+    width: 1px;
+    height: 14px;
+    background: #dcdcdc;
+    flex-shrink: 0;
+  }
+  .search-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 400;
+    color: #000;
+    outline: none;
+    font-family: inherit;
+  }
+
+  .search-tabs {
+    display: flex;
+    overflow-x: auto;
+    padding: 0 20px 0;
+    gap: 20px;
+    background: transparent;
+    white-space: nowrap;
+    scrollbar-width: none;
+    height: 20px;
+    margin-top: 0px;
+    margin-bottom: 11px;
+  }
+  .search-tabs::-webkit-scrollbar { display: none; }
+  .search-tab {
+    font-size: 15px;
+    font-weight: 400;
+    color: #787878;
+    padding-bottom: 8px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .search-tab.active {
+    color: #000;
+    font-weight: 600;
+    font-size: 16px;
+  }
+
+  .search-filters {
+    display: flex;
+    overflow-x: auto;
+    padding: 0 20px 0;
+    gap: 8px;
+    background: transparent;
+    white-space: nowrap;
+    scrollbar-width: none;
+    margin-bottom: 11px;
+  }
+  .search-filters::-webkit-scrollbar { display: none; }
+  .search-filter {
+    font-size: 13px;
+    font-weight: 400;
+    color: #787878;
+    padding: 2px 7px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .search-filter.active {
+    background: #f0f0f0;
+    color: #000;
+    font-weight: 500;
+    border-radius: 4px;
+  }
+
+  .search-loc-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    background: #fff;
+    margin-left: 6px;
+    margin-right: 6px;
+    margin-top: 0px;
+    margin-bottom: 11px;
+    border-radius: 8px;
+    border-width: 0px;
+    border-style: solid;
+    border-color: #000000;
+  }
+  .search-loc-top-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .search-loc-img {
+    width: 65px;
+    height: 65px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+  .search-loc-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+    height: 60px;
+    text-align: left;
+  }
+  .search-loc-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #000;
+    margin-bottom: 2px;
+    height: 18px;
+  }
+  .search-loc-tags {
+    display: flex;
+    gap: 5px;
+  }
+  .search-loc-tags span {
+    font-size: 11px;
+    color: #000000;
+    position: relative;
+  }
+  .search-loc-tags span:nth-child(2)::before {
+    content: '';
+    position: absolute;
+    left: -7px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0.5px;
+    height: 10px;
+    background: rgba(0, 0, 0, 0.2);
+  }
+  .search-loc-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2px;
+    height: 15px;
+  }
+  .search-loc-prompt {
+    font-size: 11px;
+    color: #FF2442;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .search-loc-checkin {
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    background: #FF2442;
+    padding: 4px 14px;
+    border-radius: 14px;
+    flex-shrink: 0;
+    cursor: pointer;
+    user-select: none;
+  }
+  .search-loc-checkin.checked {
+    background: rgba(255, 36, 66, 0.5);
+    color: #fff;
+  }
+  .search-loc-expand {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.22, 1, 0.36, 1), margin-top 0.3s ease;
+    margin-top: 0;
+  }
+  .search-loc-card.expanded .search-loc-expand {
+    max-height: 300px;
+    margin-top: 11px;
+  }
+  .search-loc-handle {
+    width: 24px;
+    height: 2px;
+    background: #d0d0d0;
+    border-radius: 2px;
+    margin: 10px auto 0;
+    cursor: pointer;
+    opacity: 0.5;
+  }
+  .search-loc-map {
+    position: relative;
+    width: 100%;
+    height: 150px;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .search-loc-map-bg {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .search-loc-xiaoditu {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .search-loc-map-pins {
+    position: absolute;
+    inset: 0;
+  }
+  .search-loc-pin {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    object-fit: cover;
+  }
+  .search-loc-pin-center {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .search-loc-pin-label {
+    position: absolute;
+    top: calc(50% + 22px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    white-space: nowrap;
+  }
+  .search-loc-expand-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: transparent;
+    border-radius: 6px;
+    gap: 6px;
+  }
+  .search-loc-expand-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+  .search-loc-expand-text {
+    font-size: 12px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .search-loc-expand-label {
+    color: #787878;
+  }
+  .search-loc-expand-title {
+    color: #000;
+  }
+  .search-loc-expand-link {
+    font-size: 12px;
+    color: #666;
+    flex-shrink: 0;
+  }
+
+  .search-scroll {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .search-scroll::-webkit-scrollbar { display: none; }
+  .search-grid {
+    display: flex;
+    gap: 4px;
+    padding: 0 4px;
+  }
+  .search-grid-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .search-grid-col .card {
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 500px) {
+    body {
+      padding: 0;
+      background: #E0E0E0;
+      align-items: stretch;
+    }
+    .phone-frame {
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+    }
+    .map-view,
+    .feed-layer {
+      width: 100%;
+      height: 100%;
+    }
+    .bottom-nav,
+    .map-bottom-nav {
+      width: 100%;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="phone-frame" id="phoneFrame">
+
+  <div class="status-bar">
+    <span class="status-time">9:41</span>
+    <div class="status-icons">
+      <div class="signal-bars">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div class="battery">
+        <div class="battery-level"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MAP VIEW (搴曞眰) ============ -->
+  <div class="map-view" id="mapView">
+    <div class="map-scroll" id="mapScroll">
+      <img class="map-bg" src="images/map_bg.png" alt="" ondragstart="return false">
+
+      <div class="map-pin" style="left: 493px; top: 579px;">
+        <div class="pin-avatar"><img src="images/touxiang-my.png" alt=""></div>
+        <div class="pin-label location"><span class="name">你的位置</span></div>
+      </div>
+
+      <div class="map-pin" style="left: 536px; top: 312px;">
+        <div class="pin-avatar"><img src="images/touxiang1.png" alt=""></div>
+        <div class="pin-label"><span class="name">Roooger</span><span class="dist">0.3km</span></div>
+      </div>
+
+      <div class="map-pin" style="left: 617px; top: 751px;">
+        <div class="pin-avatar"><img src="images/touxiang2.png" alt=""></div>
+        <div class="pin-label"><span class="name">ur_Will</span><span class="dist">0.2km</span></div>
+      </div>
+
+      <div class="map-pin" style="left: 582px; top: 368px;">
+        <div class="pin-post"><img src="images/tiezi1.png" alt=""><div class="pin-post-avatar"><img src="images/touxiang3.png" alt=""></div></div>
+      </div>
+
+      <div class="map-pin" style="left: 460px; top: 661px;">
+        <div class="pin-post"><img src="images/tiezi2.png" alt=""><div class="pin-post-avatar"><img src="images/touxiang4.png" alt=""></div></div>
+      </div>
+
+      <div class="map-pin" style="left: 438px; top: 509px;">
+        <div class="pin-post"><img src="images/tiezi3.png" alt=""><div class="pin-post-avatar"><img src="images/touxiang5.png" alt=""></div></div>
+      </div>
+
+      <div class="map-pin" style="left: 646px; top: 558px;">
+        <div class="pin-post"><img src="images/tiezi4.png" alt=""><div class="pin-post-avatar"><img src="images/touxiang6.png" alt=""></div></div>
+      </div>
+
+      <div class="map-pin" style="left: 324px; top: 359px;">
+        <div class="pin-post"><img src="images/tiezi1.png" alt=""><div class="pin-post-avatar"><img src="images/touxiang1.png" alt=""></div></div>
+      </div>
+    </div>
+
+    <div class="map-top-group">
+      <button class="map-fullscreen-back" id="mapBackBtn" style="display:none" onclick="exitFullscreenMap(); this.style.display='none'; document.getElementById('searchOverlay').classList.add('show')">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <div class="shared-location-bar">
+        <svg class="shared-loc-plane" viewBox="0 0 24 24">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+        </svg>
+        <span class="shared-loc-label">共享位置中</span>
+      </div>
+
+      <button class="back-arrow-fab" onclick="showFeed()" title="上滑返回">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" fill="none" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+    <div class="map-bottom-nav">
+      <div class="nav-items">
+        <div class="nav-item active" data-nav="home">
+          <span class="nav-label">首页</span>
+        </div>
+        <div class="nav-item" data-nav="market">
+          <span class="nav-label">市集</span>
+        </div>
+        <div class="nav-item center-btn" data-nav="publish">
+          <svg viewBox="0 0 24 24">
+            <line x1="12" y1="5" x2="12" y2="19" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+            <line x1="5" y1="12" x2="19" y2="12" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+          <span class="nav-label">发布</span>
+        </div>
+        <div class="nav-item" data-nav="message">
+          <span class="nav-label">消息</span>
+        </div>
+        <div class="nav-item" data-nav="me">
+          <span class="nav-label">我</span>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <!-- ============ FEED LAYER (顶层) ============ -->
+  <div class="feed-layer" id="feedLayer">
+
+    <div class="pull-hint" id="pullHint">
+      <svg class="hint-arrow" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 5v14M5 12l7 7 7-7"/>
+      </svg>
+      <span id="pullHintText">下拉进入地图</span>
+    </div>
+
+    <div class="page-container" id="pageContainer">
+
+      <div class="top-tabs">
+        <svg class="top-tab-icon left" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 12 A8 8 0 0 1 12 4 A8 8 0 0 1 20 12 A8 8 0 0 1 12 20 L4 20 Z"/>
+        </svg>
+        <div class="tabs-scroll">
+          <div class="tab-item" data-tab="follow">关注</div>
+          <div class="tab-item" data-tab="discover">发现</div>
+          <div class="tab-item active" data-tab="orlando">奥兰多</div>
+        </div>
+        <svg class="top-tab-icon right" onclick="openSearch()" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      </div>
+
+      <div class="filter-bar" id="filterBar">
+        <div class="filter-item" data-filter="all">全城</div>
+        <div class="filter-item active" data-filter="recommend">
+          推荐
+          <span class="refresh-icon" onclick="handleRefresh(event)">
+            <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 7a5 5 0 11-1.5-3.5" stroke="#FF2442" stroke-width="1.2" stroke-linecap="round"/>
+              <path d="M10 1.5v3h-3" stroke="#FF2442" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+        <div class="filter-item" data-filter="disney">迪士尼</div>
+        <div class="filter-item" data-filter="food">美食</div>
+        <div class="filter-item" data-filter="hot">新热打卡</div>
+        <div class="filter-item" data-filter="weekend">周末出行</div>
+      </div>
+
+      <div class="masonry" id="masonry">
+        <div class="masonry-col" id="colLeft"></div>
+        <div class="masonry-col" id="colRight"></div>
+      </div>
+
+      <div style="height: 1px;"></div>
+
+    </div>
+
+    <div class="bottom-nav">
+      <div class="nav-items">
+        <div class="nav-item active" data-nav="home">
+          <span class="nav-label">首页</span>
+        </div>
+        <div class="nav-item" data-nav="market">
+          <span class="nav-label">市集</span>
+        </div>
+        <div class="nav-item center-btn" data-nav="publish">
+          <svg viewBox="0 0 24 24">
+            <line x1="12" y1="5" x2="12" y2="19" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+            <line x1="5" y1="12" x2="19" y2="12" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+          <span class="nav-label">发布</span>
+        </div>
+        <div class="nav-item" data-nav="message">
+          <span class="nav-label">消息</span>
+        </div>
+        <div class="nav-item" data-nav="me">
+          <span class="nav-label">我</span>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+
+  </div>
+
+  <button class="view-nearby-btn" onclick="openLocation()">
+    查看附近帖子 <span class="arrow">→</span>
+  </button>
+
+  <div class="detail-overlay" id="detailOverlay">
+    <div class="detail-nav">
+      <button class="detail-nav-back" onclick="closeDetail()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="detail-nav-avatar"><img id="detailNavAvatar" src="images/avatar.png" alt=""></div>
+      <div class="detail-nav-name" id="detailNavName">momo</div>
+      <button class="detail-nav-follow">关注</button>
+      <button class="detail-nav-share">
+        <svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+      </button>
+    </div>
+    <div class="detail-scroll">
+      <div class="detail-img-wrap">
+        <div class="detail-img-tag"><span class="dot"></span>实况</div>
+        <div class="detail-img-count" id="detailImgCount">1/18</div>
+        <img class="detail-img" id="detailImg" src="" alt="">
+        <div class="detail-img-dots">
+          <span class="active"></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="detail-body">
+        <div class="detail-location">
+          <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span id="detailLocation">美国奥兰多 乐园之城</span>
+        </div>
+        <div class="detail-text" id="detailText"></div>
+      </div>
+    </div>
+    <div class="detail-footer-bar">
+      <div class="detail-input-hint">
+        <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        说点什么...
+      </div>
+      <div class="detail-bottom-action" onclick="toggleDetailLike(this)">
+        <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+        <span class="num" id="detailLikeCount">1955</span>
+      </div>
+      <div class="detail-bottom-action" onclick="toggleDetailStar(this)">
+        <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <span class="num" id="detailStarCount">231</span>
+      </div>
+      <div class="detail-bottom-action">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span class="num" id="detailCommentCount">184</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="refresh-toast" id="refreshToast">刷新成功</div>
+
+  <div class="location-overlay" id="locationOverlay">
+    <div class="loc-hero">
+      <div class="loc-hero-nav">
+        <button class="loc-nav-back" onclick="closeLocation()">
+          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" fill="none" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="loc-nav-right">
+          <button class="loc-nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </button>
+          <button class="loc-nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="loc-hero-info">
+        <div class="loc-hero-title">奥兰多·迪士尼世界</div>
+        <div class="loc-hero-meta">
+          <svg viewBox="0 0 24 24" fill="#fff" width="11" height="13"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/></svg>
+          <span>1149位薯友来过</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="loc-filter-bar">
+      <div class="loc-filter-tabs">
+        <span class="loc-filter-tab active">最新</span>
+        <span class="loc-filter-tab">最热</span>
+      </div>
+      <div class="loc-filter-btn">
+        <span>筛选</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="6"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </div>
+
+    <div class="loc-scroll-area">
+      <div class="loc-masonry">
+        <div class="loc-masonry-col" id="locColLeft"></div>
+        <div class="loc-masonry-col" id="locColRight"></div>
+      </div>
+    </div>
+
+    <button class="loc-fab">
+      <img class="loc-fab-icon" src="images/xiangji.png" alt="" ondragstart="return false">
+      <span>投稿打卡</span>
+    </button>
+  </div>
+
+  <div class="loc-detail-overlay" id="locDetailOverlay">
+    <div class="loc-detail-hero">
+      <img id="locDetailImg" src="image/post_big.jpg" alt="" ondragstart="return false">
+    </div>
+    <div class="loc-detail-top-gradient"></div>
+    <div class="loc-detail-bottom-gradient"></div>
+
+    <div class="loc-detail-nav">
+      <button class="loc-detail-back" onclick="closeLocDetail()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="loc-detail-nav-right">
+        <button class="loc-detail-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="loc-detail-social">
+      <div class="loc-detail-social-item" onclick="toggleLocDetailLike(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+        <span class="loc-detail-social-count" id="locDetailLikeCount">6234</span>
+      </div>
+      <div class="loc-detail-social-item" onclick="toggleLocDetailStar(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <span class="loc-detail-social-count" id="locDetailStarCount">2346</span>
+      </div>
+      <div class="loc-detail-social-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span class="loc-detail-social-count" id="locDetailCommentCount">1024</span>
+      </div>
+      <div class="loc-detail-social-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        <span class="loc-detail-social-count" id="locDetailShareCount">77</span>
+      </div>
+      <div class="loc-detail-social-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
+        <span class="loc-detail-social-count" id="locDetailCommentLikeCount">198</span>
+      </div>
+    </div>
+
+    <div class="loc-detail-content">
+      <div class="loc-detail-location-tag">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/></svg>
+        <span id="locDetailLocation">奥兰多·迪士尼世界</span>
+      </div>
+      <div class="loc-detail-user-row">
+        <div class="loc-detail-avatar"><img id="locDetailAvatar" src="image/avatar_hali.jpg" alt="" ondragstart="return false"></div>
+        <div class="loc-detail-name" id="locDetailName">哈尼不吃粮</div>
+        <button class="loc-detail-follow">关注</button>
+      </div>
+      <div class="loc-detail-text" id="locDetailText">在幽灵公馆偶遇了Kazuha酱！好幸运！</div>
+      <div class="loc-detail-tags" id="locDetailTags">#奥兰多迪士尼 #迪士尼烟花 #国庆去哪玩</div>
+      <div class="loc-detail-related">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>相关搜索·全球最大的迪士尼在哪？</span>
+      </div>
+    </div>
+
+    <div class="loc-detail-bottom-bar">
+      <div class="loc-detail-input">
+        <span class="loc-detail-input-placeholder">让大家听到你的声音</span>
+        <div class="loc-detail-input-icons">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        </div>
+      </div>
+      <div class="loc-detail-action-btn">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+      </div>
+    </div>
+  </div>
+
+<div class="search-overlay" id="searchOverlay">
+
+  <div class="search-entry-view">
+    <div class="search-entry-header">
+      <button class="search-back" onclick="closeSearchEntry()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" fill="none" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="search-entry-input-wrap">
+        <input type="text" class="search-entry-input" id="searchEntryInput" placeholder="搜素">
+        <button class="search-entry-clear" id="searchEntryClear" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <span class="search-input-divider"></span>
+        <button class="search-submit" onclick="doSearch()">搜索</button>
+      </div>
+    </div>
+
+    <div class="search-entry-options">
+      <div class="search-entry-option">
+        <span class="ai-radio"></span>
+        <span>展示ai回答</span>
+      </div>
+      <div class="search-entry-option">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#333" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <span>拍照搜</span>
+      </div>
+    </div>
+
+    <div class="search-entry-history" id="searchEntryHistoryWrap" style="display:none">
+      <div class="search-entry-section-title">
+        <span>搜索历史</span>
+        <span class="search-entry-clear-history" onclick="clearSearchHistory()">清空</span>
+      </div>
+      <div class="search-entry-history-tags" id="searchEntryHistory"></div>
+    </div>
+
+    <div class="search-entry-section">
+      <div class="search-entry-section-title">
+        <span>猜你想搜</span>
+        <span class="search-entry-more">...</span>
+      </div>
+      <div class="search-entry-suggests" id="searchEntrySuggests"></div>
+    </div>
+
+    <div class="search-entry-bottom">
+      <span>按住提问 有问必答✨</span>
+      <button class="search-entry-mic">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="search-results-view">
+  <div class="search-header">
+    <button class="search-back" onclick="backToEntry()">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" fill="none" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="search-input-wrap">
+      <input type="text" class="search-input" id="searchResultInput" placeholder="搜素" readonly>
+      <button class="search-input-clear">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <span class="search-input-divider"></span>
+      <button class="search-submit">搜索</button>
+    </div>
+  </div>
+
+  <div class="search-tabs">
+    <div class="search-tab active">全部</div>
+    <div class="search-tab">用户</div>
+    <div class="search-tab">商品</div>
+    <div class="search-tab">图片</div>
+    <div class="search-tab">视频</div>
+    <div class="search-tab">地点</div>
+    <div class="search-tab">问点点</div>
+  </div>
+
+  <div class="search-filters">
+    <div class="search-filter active">综合</div>
+    <div class="search-filter">最新</div>
+    <div class="search-filter">门票价格</div>
+    <div class="search-filter">多少钱</div>
+    <div class="search-filter">人均花费</div>
+    <div class="search-filter">攻略</div>
+    <div class="search-filter">纪念</div>
+  </div>
+
+  <div class="search-scroll">
+  <div class="search-loc-card">
+    <div class="search-loc-top-row">
+      <img class="search-loc-img" src="images/Orlando-touxiang.png" alt="" ondragstart="return false">
+      <div class="search-loc-info">
+        <div class="search-loc-title">奥兰多·迪士尼世界</div>
+        <div class="search-loc-tags">
+          <span>乐园</span>
+          <span>度假</span>
+        </div>
+        <div class="search-loc-foot">
+          <div class="search-loc-prompt">
+            <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 21s-7-4.5-7-10a7 7 0 0114 0c0 5.5-7 10-7 10z" fill="#FF2442"/>
+              <polyline points="8.5 11.5 11 14 16 9" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            20位薯友刚刚打卡
+          </div>
+        </div>
+      </div>
+      <div class="search-loc-checkin" onclick="this.classList.toggle('checked'); this.textContent = this.classList.contains('checked') ? '已打卡' : '打卡'; this.closest('.search-loc-card').classList.toggle('expanded', this.classList.contains('checked'))">打卡</div>
+    </div>
+    <div class="search-loc-expand">
+      <div class="search-loc-map">
+        <img class="search-loc-xiaoditu" src="images/xiaoditu.png" alt="" ondragstart="return false" onclick="document.getElementById('searchOverlay').classList.remove('show'); enterFullscreenMap(); document.getElementById('mapBackBtn').style.display='flex'">
+      </div>
+      <div class="search-loc-expand-foot">
+        <img class="search-loc-expand-avatar" src="images/map_av1.png" alt="" ondragstart="return false">
+        <div class="search-loc-expand-text"><span class="search-loc-expand-label">发布了视频</span> <span class="search-loc-expand-title">"在幽灵公馆偶遇了Kazuha酱！好幸运！"</span></div>
+        <div class="search-loc-expand-link" onclick="document.getElementById('locDetailOverlay').classList.add('show')">去看看 ›</div>
+      </div>
+    </div>
+    <div class="search-loc-handle" onclick="this.closest('.search-loc-card').classList.toggle('expanded')"></div>
+  </div>
+
+  <div class="search-grid">
+    <div class="search-grid-col" id="searchColLeft"></div>
+    <div class="search-grid-col" id="searchColRight"></div>
+  </div>
+  </div>
+  </div>
+</div>
+
+<script>
+const cards = [
+  { id: 1, img: 'images/card1.png', imgH: 251, tieziImg: 'images/tiezi1.png', text: '今天太开心了～又觉得自己能继续努力干活了🥳\n又去翻了去年借着出差去玩了奥兰多迪士尼和环球影城\n奥兰多迪士尼去了动物和好莱坞的两个园区 都很特别 别', date: '09-30', likes: 1955, user: 'momo', avatar: 'images/avatar.png', location: '美国奥兰多 乐园之城', star: 231, comment: 184, total: 18 },
+  { id: 2, img: 'images/card2.png', imgH: 251, tieziImg: 'images/tiezi2.png', text: '在奥兰多迪士尼不管是花车 入园卡 房卡 还是水幕 涂鸦 纪念品，看到Minnie and Mickey才有迪士尼的实感', date: '09-30', likes: 928, user: '周末不加班', avatar: 'images/touxiang1.png', location: '美国奥兰多 迪士尼乐园', star: 156, comment: 89, total: 12 },
+  { id: 3, img: 'images/card3.png', imgH: 251, tieziImg: 'images/tiezi3.png', text: '奥兰多懒人Epic一日刷遍所有项目经历分享', date: '09-28', likes: 567, user: 'AlexExplorer', avatar: 'images/touxiang2.png', location: '美国奥兰多 环球影城', star: 98, comment: 45, total: 8 },
+  { id: 4, img: 'images/card4.png', imgH: 141, tieziImg: 'images/tiezi4.png', text: 'Hey Disney World', date: '09-30', likes: 2341, user: '奶茶续命', avatar: 'images/touxiang3.png', location: '美国奥兰多 Magic Kingdom', star: 412, comment: 267, total: 24 },
+  { id: 5, img: 'images/card5.png', imgH: 251, tieziImg: 'images/tiezi1.png', text: '奥兰多除了游乐园还有很多winter park 这里真的很适合休息日逛逛', date: '09-30', likes: 789, user: 'TravelDiary', avatar: 'images/touxiang4.png', location: '美国奥兰多 Winter Park', star: 145, comment: 67, total: 15 },
+];
+
+const locCards = [
+  { id: 1, img: 'images/loc4.png', imgH: 251, text: '在幽灵公馆偶遇了Kazuha酱！好幸运！', date: '30分钟前', likes: 6234, user: '哈尼不吃粮', avatar: 'image/avatar_hali.jpg', location: '奥兰多·迪士尼世界', tags: '#奥兰多迪士尼 #迪士尼烟花 #国庆去哪玩', star: 2346, comment: 1024, share: 77, commentLike: 198, detailImg: 'image/post_big.jpg' },
+  { id: 2, img: 'images/loc2.png', imgH: 180, text: '奥兰多迪士尼 Hollywood Studio第二天！超级好玩的...', date: '刚刚', likes: 85, user: '草莓萱萱', avatar: 'images/touxiang2.png' },
+  { id: 3, img: 'images/loc3.png', imgH: 251, text: '对不起，上迪，我再也不说你人山人海了 来了奥兰多...', date: '2小时前', likes: 342, user: '上迪拜拜', avatar: 'images/touxiang3.png' },
+  { id: 4, img: 'images/loc1.png', imgH: 220, text: 'Orlando Disney world 现实版的童话世界~', date: '昨天', likes: 521, user: '迪士尼在逃公主', avatar: 'images/touxiang4.png' },
+  { id: 5, img: 'images/image1.png', imgH: 200, text: '环球影城也超好玩！哈利波特园区真的太绝了，禁忌之旅必刷！', date: '3天前', likes: 889, user: '麻瓜不瓜', avatar: 'images/touxiang5.png' },
+];
+
+const searchCards = [
+  { id: 1, img: 'images/tiezi5.png', imgH: 220, text: '奥兰多8天(1)迪士尼环球Kelly Park', date: '09-30', likes: 93, user: '___coffe', avatar: 'images/touxiang7.png' },
+  { id: 2, img: 'images/tiezi6.png', imgH: 240, text: '很小巧紧凑的园区，热门项目排队时间都很长，配合llm可以一早上刷完🤪', date: '09-28', likes: 93, user: 'sakura', avatar: 'images/touxiang8.png' },
+  { id: 3, img: 'images/tiezi7.png', imgH: 200, text: '说实话 我是为了阿凡达二刷的奥兰多', date: '09-25', likes: 326, user: '阿凡达粉', avatar: 'images/touxiang9.png', isVideo: true },
+  { id: 4, img: 'images/tiezi8.png', imgH: 250, text: '奥兰多Animal Kingdom🦁请一定要早起‼️', date: '09-20', likes: 187, user: 'sparkle', avatar: 'images/touxiang10.png' },
+  { id: 5, img: 'images/card4.png', imgH: 230, text: '奥兰多Animal Kingdom🦁请一定要早起‼️', date: '09-18', likes: 445, user: '黑莓派', avatar: 'images/touxiang10.png', tagged: '已打卡' },
+  { id: 6, img: 'images/card5.png', imgH: 180, text: '打卡奥兰多迪士尼的第101天', date: '10-01', likes: 234, user: '迪士尼爱好者', avatar: 'images/touxiang1.png' },
+];
+
+function openSearch() {
+  const o = document.getElementById('searchOverlay');
+  o.classList.add('show', 'mode-entry');
+  o.classList.remove('mode-results');
+  renderSuggests();
+  renderHistory();
+  setTimeout(() => document.getElementById('searchEntryInput').focus(), 50);
+}
+function closeSearchEntry() {
+  document.getElementById('searchOverlay').classList.remove('show');
+}
+function backToEntry() {
+  const o = document.getElementById('searchOverlay');
+  o.classList.remove('mode-results');
+  o.classList.add('mode-entry');
+  renderSuggests();
+  renderHistory();
+  setTimeout(() => document.getElementById('searchEntryInput').focus(), 50);
+}
+
+const SEARCH_SUGGESTS = [
+  '奥兰多迪士尼攻略', '奥兰多环球影城', '奥兰多天气', '奥兰多美食',
+  '奥兰多住宿', '奥兰多旅游', '奥兰多迪士尼餐厅', '奥兰多Animal Kingdom',
+];
+
+function getSearchHistory() {
+  try { return JSON.parse(localStorage.getItem('searchHistory') || '[]'); } catch(e) { return []; }
+}
+function saveSearchHistory(q) {
+  if (!q || !q.trim()) return;
+  let list = getSearchHistory();
+  list = list.filter(i => i !== q);
+  list.unshift(q);
+  list = list.slice(0, 10);
+  localStorage.setItem('searchHistory', JSON.stringify(list));
+}
+function clearSearchHistory() {
+  localStorage.removeItem('searchHistory');
+  renderHistory();
+}
+function renderSuggests() {
+  const box = document.getElementById('searchEntrySuggests');
+  if (!box) return;
+  box.innerHTML = '';
+  SEARCH_SUGGESTS.forEach(s => {
+    const d = document.createElement('div');
+    d.className = 'search-entry-suggest-item';
+    d.textContent = s;
+    d.onclick = () => { document.getElementById('searchEntryInput').value = s; doSearch(); };
+    box.appendChild(d);
+  });
+}
+function renderHistory() {
+  const list = getSearchHistory();
+  const wrap = document.getElementById('searchEntryHistoryWrap');
+  const box = document.getElementById('searchEntryHistory');
+  if (!wrap || !box) return;
+  if (list.length === 0) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  box.innerHTML = '';
+  list.forEach(s => {
+    const t = document.createElement('span');
+    t.className = 'search-entry-history-tag';
+    t.textContent = s;
+    t.onclick = () => { document.getElementById('searchEntryInput').value = s; doSearch(); };
+    box.appendChild(t);
+  });
+}
+function doSearch() {
+  const input = document.getElementById('searchEntryInput');
+  const q = input ? input.value.trim() : '';
+  if (!q) return;
+  saveSearchHistory(q);
+  const o = document.getElementById('searchOverlay');
+  o.classList.remove('mode-entry');
+  o.classList.add('mode-results');
+  const resultInput = document.getElementById('searchResultInput');
+  if (resultInput) resultInput.value = q;
+  renderSearchCards();
+}
+
+(function bindSearchEntryEvents() {
+  const input = document.getElementById('searchEntryInput');
+  const clear = document.getElementById('searchEntryClear');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    if (clear) clear.style.display = input.value ? 'flex' : 'none';
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') doSearch();
+  });
+  if (clear) clear.onclick = () => {
+    input.value = '';
+    clear.style.display = 'none';
+    input.focus();
+  };
+})();
+function renderSearchCards() {
+  const colLeft = document.getElementById('searchColLeft');
+  const colRight = document.getElementById('searchColRight');
+  if (!colLeft || !colRight) return;
+  colLeft.innerHTML = '';
+  colRight.innerHTML = '';
+  searchCards.forEach((card, idx) => {
+    const col = idx % 2 === 0 ? colLeft : colRight;
+    const cardEl = document.createElement('div');
+    cardEl.className = 'card';
+    cardEl.dataset.id = card.id;
+    cardEl.innerHTML = `
+      <div class="card-img-wrap">
+        <img class="card-img" src="${card.img}" alt="" style="height:${card.imgH}px" ondragstart="return false">
+      </div>
+      <div class="card-body">
+        <div class="card-text">${card.text}</div>
+        <div class="card-footer">
+          <div class="card-user">
+            <div class="user-avatar"><img src="${card.avatar}" alt="" ondragstart="return false"></div>
+            <div class="user-info">
+              <span class="user-name">${card.user}</span>
+              <span class="user-date">${card.date}</span>
+            </div>
+          </div>
+          <div class="card-like" data-id="${card.id}" onclick="event.stopPropagation(); toggleLike(this)">
+            <svg class="like-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+              <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+            </svg>
+            <span class="like-count">${card.likes}</span>
+          </div>
+        </div>
+      </div>
+    `;
+    cardEl.addEventListener('click', () => openDetail(card));
+    col.appendChild(cardEl);
+  });
+}
+
+function renderCards() {
+  const colLeft = document.getElementById('colLeft');
+  const colRight = document.getElementById('colRight');
+  colLeft.innerHTML = '';
+  colRight.innerHTML = '';
+
+  cards.forEach((card, idx) => {
+    let col;
+    if (card.id === 5) {
+      col = colRight;
+    } else {
+      col = idx % 2 === 0 ? colLeft : colRight;
+    }
+    const cardEl = document.createElement('div');
+    cardEl.className = 'card';
+    cardEl.dataset.id = card.id;
+    cardEl.innerHTML = `
+      <img class="card-img" src="${card.img}" alt="" style="height:${card.imgH}px" ondragstart="return false">
+      <div class="card-body">
+        <div class="card-text">${card.text}</div>
+        <div class="card-footer">
+          <div class="card-user">
+            <div class="user-avatar"><img src="images/avatar.png" alt="" ondragstart="return false"></div>
+            <div class="user-info">
+              <span class="user-name">${card.user}</span>
+              <span class="user-date">${card.date}</span>
+            </div>
+          </div>
+          <div class="card-like" data-id="${card.id}" onclick="event.stopPropagation(); toggleLike(this)">
+            <svg class="like-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+              <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+            </svg>
+            <span class="like-count">${card.likes}</span>
+          </div>
+        </div>
+      </div>
+    `;
+    cardEl.addEventListener('click', () => openDetail(card));
+    col.appendChild(cardEl);
+  });
+}
+
+function toggleLike(el) {
+  const id = parseInt(el.dataset.id);
+  const card = cards.find(c => c.id === id);
+  const countEl = el.querySelector('.like-count');
+  const icon = el.querySelector('.like-icon');
+
+  if (el.classList.contains('liked')) {
+    el.classList.remove('liked');
+    card.likes--;
+    countEl.textContent = card.likes;
+    icon.style.fill = 'none';
+  } else {
+    el.classList.add('liked', 'heart-pop');
+    card.likes++;
+    countEl.textContent = card.likes;
+    icon.style.fill = '#FF2442';
+    setTimeout(() => el.classList.remove('heart-pop'), 300);
+  }
+}
+
+function toggleDetailLike(el) {
+  const countEl = document.getElementById('detailLikeCount');
+  let count = parseInt(countEl.textContent);
+  if (el.classList.contains('liked')) {
+    el.classList.remove('liked');
+    count--;
+  } else {
+    el.classList.add('liked');
+    count++;
+  }
+  countEl.textContent = count;
+}
+
+function toggleDetailStar(el) {
+  const countEl = document.getElementById('detailStarCount');
+  let count = parseInt(countEl.textContent);
+  if (el.classList.contains('starred')) {
+    el.classList.remove('starred');
+    count--;
+  } else {
+    el.classList.add('starred');
+    count++;
+  }
+  countEl.textContent = count;
+}
+
+function openDetail(card) {
+  document.getElementById('detailNavAvatar').src = card.avatar || 'images/avatar.png';
+  document.getElementById('detailNavName').textContent = card.user || '';
+  document.getElementById('detailImg').src = card.img;
+  document.getElementById('detailImgCount').textContent = '1/' + (card.total || 1);
+  document.getElementById('detailLocation').textContent = card.location || '';
+  document.getElementById('detailText').textContent = card.text || '';
+  document.getElementById('detailLikeCount').textContent = card.likes ?? 0;
+  document.getElementById('detailStarCount').textContent = card.star ?? 0;
+  document.getElementById('detailCommentCount').textContent = card.comment ?? 0;
+
+  document.querySelectorAll('.detail-bottom-action').forEach(a => {
+    a.classList.remove('liked', 'starred');
+  });
+
+  document.getElementById('detailOverlay').classList.add('show');
+}
+
+function closeDetail() {
+  document.getElementById('detailOverlay').classList.remove('show');
+}
+
+document.querySelectorAll('.tab-item').forEach(tab => {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    showToast('切换到：' + this.textContent);
+  });
+});
+
+document.querySelectorAll('.filter-item').forEach(item => {
+  item.addEventListener('click', function(e) {
+    if (e.target.closest('.refresh-icon')) return;
+    document.querySelectorAll('.filter-item').forEach(i => i.classList.remove('active'));
+    this.classList.add('active');
+    showToast('筛选：' + this.textContent.trim());
+  });
+});
+
+function openLocDetail(card) {
+  const overlay = document.getElementById('locDetailOverlay');
+  const heroImg = document.getElementById('locDetailImg');
+  if (card.detailImg) {
+    heroImg.src = card.detailImg;
+  } else if (card.img) {
+    heroImg.src = card.img;
+  }
+  if (card.avatar) document.getElementById('locDetailAvatar').src = card.avatar;
+  if (card.user) document.getElementById('locDetailName').textContent = card.user;
+  if (card.text) document.getElementById('locDetailText').textContent = card.text;
+  if (card.location) document.getElementById('locDetailLocation').textContent = card.location;
+  if (card.tags) document.getElementById('locDetailTags').textContent = card.tags;
+  if (card.likes != null) document.getElementById('locDetailLikeCount').textContent = card.likes;
+  if (card.star != null) document.getElementById('locDetailStarCount').textContent = card.star;
+  if (card.comment != null) document.getElementById('locDetailCommentCount').textContent = card.comment;
+  if (card.share != null) document.getElementById('locDetailShareCount').textContent = card.share;
+  if (card.commentLike != null) document.getElementById('locDetailCommentLikeCount').textContent = card.commentLike;
+  overlay.querySelectorAll('.loc-detail-social-item').forEach(a => {
+    a.classList.remove('liked', 'starred');
+  });
+  overlay.classList.add('show');
+}
+
+function closeLocDetail() {
+  document.getElementById('locDetailOverlay').classList.remove('show');
+}
+
+function toggleLocDetailLike(el) {
+  el.classList.toggle('liked');
+  const countEl = el.querySelector('.loc-detail-social-count');
+  let c = parseInt(countEl.textContent);
+  countEl.textContent = el.classList.contains('liked') ? c + 1 : c - 1;
+  el.classList.add('heart-pop');
+  setTimeout(() => el.classList.remove('heart-pop'), 300);
+}
+
+function toggleLocDetailStar(el) {
+  el.classList.toggle('starred');
+  const countEl = el.querySelector('.loc-detail-social-count');
+  let c = parseInt(countEl.textContent);
+  countEl.textContent = el.classList.contains('starred') ? c + 1 : c - 1;
+}
+
+function handleRefresh(e) {
+  e.stopPropagation();
+  const item = e.currentTarget.closest('.filter-item');
+  const icon = item.querySelector('.refresh-icon svg');
+  icon.style.transition = 'transform 0.5s';
+  icon.style.transform = 'rotate(360deg)';
+  setTimeout(() => { icon.style.transform = 'rotate(0deg)'; }, 500);
+  setTimeout(() => icon.style.transition = '', 600);
+  showToast('刷新中...');
+}
+
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', function() {
+    const nav = this.dataset.nav;
+    if (nav === 'publish') {
+      showToast('点击了发布按钮 ✨');
+      return;
+    }
+    const parentLayer = this.closest('.map-view') ? '.map-view' : '.feed-layer';
+    document.querySelectorAll(parentLayer + ' .nav-item').forEach(i => {
+      if (i.dataset.nav !== 'publish') {
+        i.classList.remove('active');
+        const svg = i.querySelector('svg');
+        if (svg) svg.style.stroke = '#333';
+      }
+    });
+    this.classList.add('active');
+    const svg = this.querySelector('svg');
+    if (svg && nav !== 'publish') svg.style.stroke = '#FF2442';
+    const labels = { home: '首页', market: '市集', message: '消息', me: '我的' };
+    if (labels[nav]) showToast('切换到：' + labels[nav]);
+  });
+});
+
+function showToast(msg) {
+  const toast = document.getElementById('refreshToast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => toast.classList.remove('show'), 1500);
+}
+
+function updateTime() {
+  const now = new Date();
+  const h = now.getHours().toString().padStart(2, '0');
+  const m = now.getMinutes().toString().padStart(2, '0');
+  document.querySelectorAll('.status-time').forEach(el => el.textContent = `${h}:${m}`);
+}
+
+/* ============ PULL-DOWN → MAP → PULL-UP RETURN ============ */
+const feedLayer = document.getElementById('feedLayer');
+const pageContainer = document.getElementById('pageContainer');
+const pullHint = document.getElementById('pullHint');
+const pullHintText = document.getElementById('pullHintText');
+
+const VIEW_H = 844;
+const GRAB_HANDLE_H = 140;
+const MAP_REST_POS = VIEW_H - GRAB_HANDLE_H;
+const PULL_THRESHOLD = 180;
+const PULL_MAX = 500;
+
+let currentView = 'feed';
+let dragStartY = 0;
+let dragDeltaY = 0;
+let isDragging = false;
+let containerAtTop = true;
+
+pageContainer.addEventListener('scroll', () => {
+  containerAtTop = pageContainer.scrollTop <= 0;
+});
+
+function elastic(dist) {
+  if (dist <= 0) return 0;
+  let dampened = dist * 0.55;
+  if (dist > PULL_MAX) {
+    dampened = PULL_MAX * 0.55 + (dist - PULL_MAX) * 0.2;
+  }
+  return dampened;
+}
+
+function handleDragStart(clientY) {
+  if (currentView === 'feed' && !containerAtTop) return;
+  isDragging = true;
+  dragStartY = clientY;
+  dragDeltaY = 0;
+  feedLayer.classList.add('dragging');
+}
+
+function handleDragMove(clientY) {
+  if (!isDragging) return;
+  dragDeltaY = clientY - dragStartY;
+
+  if (currentView === 'feed') {
+    if (dragDeltaY > 0) {
+      const offset = elastic(dragDeltaY);
+      feedLayer.style.transform = `translateY(${offset}px)`;
+      if (dragDeltaY > 50) pullHint.classList.add('show');
+      if (dragDeltaY > PULL_THRESHOLD) {
+        pullHint.classList.add('ready');
+        pullHintText.textContent = '松开进入地图';
+      } else {
+        pullHint.classList.remove('ready');
+        pullHintText.textContent = '下拉进入地图';
+      }
+    }
+  } else {
+    if (dragDeltaY < 0) {
+      const dampened = elastic(-dragDeltaY);
+      let feedOffset = MAP_REST_POS - dampened;
+      feedOffset = Math.max(0, feedOffset);
+      feedLayer.style.transform = `translateY(${feedOffset}px)`;
+    } else {
+      const dampened = elastic(dragDeltaY);
+      feedLayer.style.transform = `translateY(${MAP_REST_POS + dampened}px)`;
+    }
+  }
+}
+
+function handleDragEnd() {
+  if (!isDragging) return;
+  isDragging = false;
+  feedLayer.classList.remove('dragging');
+
+  if (currentView === 'feed') {
+    if (dragDeltaY > PULL_THRESHOLD) {
+      showMap();
+    } else {
+      feedLayer.style.transform = 'translateY(0)';
+    }
+    setTimeout(() => {
+      pullHint.classList.remove('show');
+      pullHint.classList.remove('ready');
+    }, 280);
+  } else {
+    if (dragDeltaY < 0 && -dragDeltaY > PULL_THRESHOLD) {
+      showFeed();
+    } else {
+      feedLayer.style.transform = `translateY(${MAP_REST_POS}px)`;
+    }
+  }
+  dragDeltaY = 0;
+}
+
+feedLayer.addEventListener('touchstart', (e) => {
+  handleDragStart(e.touches[0].clientY);
+}, { passive: true });
+feedLayer.addEventListener('touchmove', (e) => {
+  handleDragMove(e.touches[0].clientY);
+}, { passive: true });
+feedLayer.addEventListener('touchend', handleDragEnd);
+feedLayer.addEventListener('touchcancel', handleDragEnd);
+
+let mouseDown = false;
+feedLayer.addEventListener('mousedown', (e) => {
+  mouseDown = true;
+  handleDragStart(e.clientY);
+});
+document.addEventListener('mousemove', (e) => {
+  if (mouseDown) handleDragMove(e.clientY);
+});
+document.addEventListener('mouseup', () => {
+  if (mouseDown) {
+    mouseDown = false;
+    handleDragEnd();
+  }
+});
+
+function showFeed() {
+  feedLayer.style.transform = 'translateY(0)';
+  currentView = 'feed';
+  feedLayer.classList.remove('in-map');
+  document.getElementById('phoneFrame').classList.remove('map-fullscreen');
+  pageContainer.scrollTop = 0;
+}
+
+function showMap() {
+  feedLayer.style.transform = `translateY(${MAP_REST_POS}px)`;
+  currentView = 'map';
+  feedLayer.classList.add('in-map');
+  resetMapPan();
+}
+
+function enterFullscreenMap() {
+  feedLayer.style.transform = 'translateY(860px)';
+  currentView = 'map';
+  document.getElementById('phoneFrame').classList.add('map-fullscreen');
+  resetMapPan();
+}
+function exitFullscreenMap() {
+  showFeed();
+}
+
+function openLocation() {
+  document.getElementById('locationOverlay').classList.add('show');
+  renderLocCards();
+}
+
+function closeLocation() {
+  document.getElementById('locationOverlay').classList.remove('show');
+}
+
+function renderLocCards() {
+  const colLeft = document.getElementById('locColLeft');
+  const colRight = document.getElementById('locColRight');
+  if (!colLeft || !colRight) return;
+  colLeft.innerHTML = '';
+  colRight.innerHTML = '';
+  locCards.forEach((card, idx) => {
+    const col = idx % 2 === 0 && idx !== 4 ? colLeft : colRight;
+    const cardEl = document.createElement('div');
+    cardEl.className = 'loc-card';
+    cardEl.innerHTML = `
+      <img class="loc-card-img" src="${card.img}" alt="" style="height:${card.imgH}px" ondragstart="return false">
+      <div class="loc-card-play"><svg viewBox="0 0 24 24"><polygon points="6,4 20,12 6,20"/></svg></div>
+      <div class="loc-card-body">
+        <div class="loc-card-text">${card.text}</div>
+        <div class="loc-card-footer">
+          <div class="loc-card-user">
+            <div class="loc-card-avatar"><img src="${card.avatar}" alt="" ondragstart="return false"></div>
+            <div class="loc-card-user-info">
+              <span class="loc-card-name">${card.user}</span>
+              <span class="loc-card-date">${card.date}</span>
+            </div>
+          </div>
+          <div class="loc-card-like">
+            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+            <span>${card.likes}</span>
+          </div>
+        </div>
+      </div>
+    `;
+    col.appendChild(cardEl);
+    cardEl.addEventListener('click', () => openLocDetail(card));
+  });
+}
+
+let MAP_W = 0;
+let MAP_H = 0;
+const VIEW_W = 390;
+let MAP_MIN_X = 0;
+let MAP_MIN_Y = 0;
+
+let mapPanX = 0;
+let mapPanY = 0;
+let mapDragStartX = 0;
+let mapDragStartY = 0;
+let mapPanStartX = 0;
+let mapPanStartY = 0;
+let isMapPanning = false;
+
+const mapScroll = document.getElementById('mapScroll');
+const mapView = document.getElementById('mapView');
+const mapBgImg = document.querySelector('.map-bg');
+
+function initMapScroll() {
+  MAP_W = mapBgImg.naturalWidth;
+  MAP_H = mapBgImg.naturalHeight;
+  MAP_MIN_X = -(MAP_W - VIEW_W);
+  MAP_MIN_Y = -(MAP_H - VIEW_H);
+  mapScroll.style.width = MAP_W + 'px';
+  mapScroll.style.height = MAP_H + 'px';
+  resetMapPan();
+  bindMapPinClicks();
+}
+
+function bindMapPinClicks() {
+  mapScroll.querySelectorAll('.map-pin').forEach(pin => {
+    const post = pin.querySelector('.pin-post');
+    if (!post) return;
+    pin.addEventListener('click', () => {
+      const imgSrc = post.querySelector('img')?.getAttribute('src') || '';
+      const avatarSrc = post.querySelector('.pin-post-avatar img')?.getAttribute('src') || '';
+      const card = cards.find(c => c.tieziImg === imgSrc) || cards[0];
+      const detailCard = {
+        img: imgSrc,
+        detailImg: imgSrc,
+        avatar: avatarSrc || card.avatar,
+        user: card.user,
+        text: card.text,
+        location: '奥兰多·迪士尼世界',
+        tags: '#奥兰多迪士尼 #迪士尼烟花 #国庆去哪玩',
+        likes: card.likes,
+        star: card.star,
+        comment: card.comment,
+        share: Math.floor(Math.random() * 100) + 10,
+        commentLike: Math.floor(Math.random() * 200) + 50
+      };
+      openLocDetail(detailCard);
+    });
+  });
+}
+
+if (mapBgImg.complete && mapBgImg.naturalWidth > 0) {
+  initMapScroll();
+} else {
+  mapBgImg.addEventListener('load', initMapScroll);
+}
+
+function clampMap(x, y) {
+  let cx = Math.max(MAP_MIN_X, Math.min(0, x));
+  let cy = Math.max(MAP_MIN_Y, Math.min(0, y));
+  return { x: cx, y: cy };
+}
+
+function applyMapPan() {
+  mapScroll.style.transform = `translate(${mapPanX}px, ${mapPanY}px)`;
+}
+
+function resetMapPan() {
+  const myPin = mapScroll.querySelector('.map-pin:has(.pin-label.location)');
+  const pins = mapScroll.querySelectorAll('.map-pin');
+
+  let cx, cy;
+  if (myPin) {
+    cx = parseFloat(myPin.style.left) || 0;
+    cy = parseFloat(myPin.style.top) || 0;
+  } else if (pins.length > 0) {
+    let sumX = 0, sumY = 0;
+    pins.forEach(p => {
+      sumX += parseFloat(p.style.left) || 0;
+      sumY += parseFloat(p.style.top) || 0;
+    });
+    cx = sumX / pins.length;
+    cy = sumY / pins.length;
+  } else {
+    mapPanX = Math.floor(MAP_MIN_X / 2);
+    mapPanY = Math.floor(MAP_MIN_Y / 2);
+    applyMapPan();
+    return;
+  }
+  const targetX = Math.floor(VIEW_W / 2 - cx);
+  const targetY = Math.floor(VIEW_H / 2 - cy);
+  const clamped = clampMap(targetX, targetY);
+  mapPanX = clamped.x;
+  mapPanY = clamped.y;
+  applyMapPan();
+}
+
+function mapPanStart(clientX, clientY) {
+  if (currentView !== 'map') return;
+  isMapPanning = true;
+  mapDragStartX = clientX;
+  mapDragStartY = clientY;
+  mapPanStartX = mapPanX;
+  mapPanStartY = mapPanY;
+  mapScroll.classList.remove('snap');
+  mapScroll.classList.add('panning');
+}
+
+function mapPanMove(clientX, clientY) {
+  if (!isMapPanning) return;
+  const dx = clientX - mapDragStartX;
+  const dy = clientY - mapDragStartY;
+  const targetX = mapPanStartX + dx;
+  const targetY = mapPanStartY + dy;
+  const clamped = clampMap(targetX, targetY);
+  mapPanX = clamped.x;
+  mapPanY = clamped.y;
+  applyMapPan();
+}
+
+function mapPanEnd() {
+  if (!isMapPanning) return;
+  isMapPanning = false;
+  mapScroll.classList.remove('panning');
+}
+
+mapView.addEventListener('touchstart', (e) => {
+  if (e.target.closest('.map-pin') || e.target.closest('.shared-location-bar')) return;
+  mapPanStart(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: true });
+
+mapView.addEventListener('touchmove', (e) => {
+  mapPanMove(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: true });
+
+mapView.addEventListener('touchend', mapPanEnd);
+mapView.addEventListener('touchcancel', mapPanEnd);
+
+let mapMouseDown = false;
+mapView.addEventListener('mousedown', (e) => {
+  if (e.target.closest('.map-pin') || e.target.closest('.shared-location-bar')) return;
+  mapMouseDown = true;
+  mapPanStart(e.clientX, e.clientY);
+});
+document.addEventListener('mousemove', (e) => {
+  if (mapMouseDown) mapPanMove(e.clientX, e.clientY);
+});
+document.addEventListener('mouseup', () => {
+  if (mapMouseDown) {
+    mapMouseDown = false;
+    mapPanEnd();
+  }
+});
+
+renderCards();
+updateTime();
+setInterval(updateTime, 30000);
+</script>
+
+</body>
+</html>
